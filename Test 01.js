@@ -3,44 +3,39 @@
 
     const style = document.createElement('style');
     style.innerHTML = `
-        .live-mode-active { color: #27ae60 !important; font-weight: bold !important; }
-        .icon-live-fix { filter: hue-rotate(110deg) brightness(1.2) contrast(1.1) !important; }
-        .leaderboard__item, .table__row { border-left: 2px solid #27ae60 !important; }
+        .live-active { color: #27ae60 !important; font-weight: bold !important; }
+        .icon-fix { filter: hue-rotate(110deg) brightness(1.2) contrast(1.1) !important; }
     `;
     document.head.appendChild(style);
 
-    function coreEngine() {
-        // 1. Text Replacement
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-        let node;
-        while (node = walker.nextNode()) {
-            if (node.parentElement && !node.parentElement.closest('canvas, .chart-container')) {
-                let val = node.nodeValue;
-                if (/Demo|Practice/i.test(val)) {
-                    node.nodeValue = val.replace(/Demo/gi, 'Live').replace(/Practice/gi, 'Real');
-                    node.parentElement.classList.add('live-mode-active');
+    const updateUI = (node) => {
+        if (node.nodeType === 3) {
+            if (/Demo|Practice/i.test(node.nodeValue)) {
+                node.nodeValue = node.nodeValue.replace(/Demo/gi, 'Live').replace(/Practice/gi, 'Real');
+            }
+        } else if (node.nodeType === 1) {
+            if (node.tagName === 'CANVAS' || node.classList.contains('chart-container')) return;
+            
+            if (node.innerHTML && (node.innerHTML.includes('Demo') || node.innerHTML.includes('Practice'))) {
+                if (node.children.length === 0) {
+                    node.innerHTML = node.innerHTML.replace(/Demo/gi, 'Live').replace(/Practice/gi, 'Real');
                 }
             }
+            
+            if (['IMG', 'SVG', 'I'].includes(node.tagName)) {
+                if (node.outerHTML.toLowerCase().includes('demo')) node.classList.add('icon-fix');
+            }
+            node.childNodes.forEach(updateUI);
         }
+    };
 
-        // 2. Leaderboard, Balance & Sidebar Fix
-        const uiElements = document.querySelectorAll('.leaderboard__item, .sidebar__item, .account-status, .user-balance, .table__cell');
-        uiElements.forEach(el => {
-            if (el.innerHTML.includes('Demo')) {
-                el.innerHTML = el.innerHTML.replace(/Demo/gi, 'Live');
-            }
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((m) => {
+            m.addedNodes.forEach(updateUI);
+            if (m.type === 'characterData') updateUI(m.target);
         });
+    });
 
-        // 3. Icons & Images Fix
-        document.querySelectorAll('img, svg, i').forEach(icon => {
-            const html = icon.outerHTML.toLowerCase();
-            if (html.includes('demo') || html.includes('practice')) {
-                icon.classList.add('icon-live-fix');
-            }
-        });
-    }
-
-    // High speed update for real-time leaderboard
-    setInterval(coreEngine, 500);
-    coreEngine();
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    updateUI(document.body);
 })();
